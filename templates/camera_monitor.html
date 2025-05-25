@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kamera monitoring</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .camera-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        #camera-feed {
+            width: 100%;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+        }
+        .detection-box {
+            position: absolute;
+            border: 2px solid #00ff00;
+            pointer-events: none;
+        }
+        .detection-info {
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-top: -20px;
+        }
+        .overlay-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Kamera monitoring</h5>
+                        <small>{{ current_user }} - {{ current_time }}</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="camera-container mb-4">
+                            <video id="camera-feed" autoplay playsinline></video>
+                            <div id="overlay-container" class="overlay-container"></div>
+                            <div class="loading-overlay" id="loading-overlay">
+                                <div class="spinner-border text-light" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="text-center mb-4">
+                            <button class="btn btn-primary me-2" onclick="startCamera()">
+                                <i class="fas fa-video"></i> Kamerani yoqish
+                            </button>
+                            <button class="btn btn-success me-2" onclick="captureAndAnalyze()">
+                                <i class="fas fa-camera"></i> Aniqlash
+                            </button>
+                            <button class="btn btn-danger" onclick="stopCamera()">
+                                <i class="fas fa-video-slash"></i> Kamerani o'chirish
+                            </button>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div id="detection-results" class="alert alert-info" style="display: none;">
+                                    <h6 class="mb-3">Aniqlangan ma'lumotlar:</h6>
+                                    <div id="results-content"></div>
+                                    <div id="multi-face-table" style="display: none;">
+                                        <hr>
+                                        <h6>Barcha aniqlangan yuzlar:</h6>
+                                        <table class="table table-sm">
+                                            <thead>
+                                                <tr>
+                                                    <th>#</th>
+                                                    <th>Yosh</th>
+                                                    <th>Jins</th>
+                                                    <th>Kiyim</th>
+                                                    <th>Ishonchlilik (%)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="multi-face-tbody"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div id="action-panel" class="alert alert-success" style="display: none;">
+                                    <h6 class="mb-3">Ma'lumotlarni saqlash:</h6>
+                                    <div class="mb-3">
+                                        <label>Telefon raqami:</label>
+                                        <input type="tel" class="form-control" id="phone-input"
+                                               pattern="\+998[0-9]{9}" placeholder="+998901234567">
+                                    </div>
+                                    <button class="btn btn-primary w-100" onclick="saveDetection()">
+                                        Ma'lumotlarni saqlash
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="statistics-panel" class="mt-4" style="display: none;">
+                            <div class="card">
+                                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                                    <span>AI Tahlili</span>
+                                    <span id="ai-probability-badge" class="badge bg-warning text-dark"></span>
+                                </div>
+                                <div class="card-body">
+                                    <h5 class="card-title" id="purpose-text"></h5>
+                                    <p class="card-text" id="comparison-text"></p>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <h6>Xarid ehtimoli:</h6>
+                                            <div class="progress mb-3">
+                                                <div id="probability-bar" class="progress-bar" role="progressbar"></div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h6>Tavsiya etilgan modellar:</h6>
+                                            <ul id="suggested-cars-list" class="list-group list-group-flush"></ul>
+                                        </div>
+                                    </div>
+                                    <p class="card-text mt-3" id="suggestion-text"></p>
+                                    <div id="actual-top3-block" class="mt-3" style="display: none;">
+                                        <h6>O'xshashlar eng ko'p tanlaganlar:</h6>
+                                        <ul id="actual-top3-list" class="list-group list-group-flush"></ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="error-message" class="alert alert-danger mt-3" style="display: none;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let videoStream;
+        let isAnalyzing = false;
+        let lastDetectionData = null;
+
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                });
+                videoStream = stream;
+                const video = document.getElementById('camera-feed');
+                video.srcObject = stream;
+            } catch (error) {
+                showError('Kamerani ishga tushirishda xatolik: ' + error.message);
+            }
+        }
+
+        function stopCamera() {
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                document.getElementById('camera-feed').srcObject = null;
+                document.getElementById('overlay-container').innerHTML = '';
+                document.getElementById('detection-results').style.display = 'none';
+                document.getElementById('action-panel').style.display = 'none';
+                document.getElementById('statistics-panel').style.display = 'none';
+                document.getElementById('error-message').style.display = 'none';
+            }
+        }
+
+        function showError(msg) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = msg;
+            errorDiv.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('error-message').style.display = 'none';
+        }
+
+        async function captureAndAnalyze() {
+            if (isAnalyzing) return;
+
+            const loadingOverlay = document.getElementById('loading-overlay');
+            loadingOverlay.style.display = 'flex';
+            hideError();
+            isAnalyzing = true;
+
+            try {
+                const video = document.getElementById('camera-feed');
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+
+                const imageData = canvas.toDataURL('image/jpeg');
+
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ image: imageData })
+                });
+
+                if (!response.ok) throw new Error('Analysis failed');
+
+                const data = await response.json();
+                lastDetectionData = data;
+
+                if (data.status === 'success') {
+                    displayResults(data);
+                    updateOverlay(data.results);
+                } else {
+                    throw new Error(data.message || 'Analysis failed');
+                }
+
+            } catch (error) {
+                showError('Xatolik: ' + error.message);
+            } finally {
+                loadingOverlay.style.display = 'none';
+                isAnalyzing = false;
+            }
+        }
+
+        function displayResults(data) {
+            const resultsDiv = document.getElementById('results-content');
+            const statsPanel = document.getElementById('statistics-panel');
+            const actionPanel = document.getElementById('action-panel');
+            const aiProbabilityBadge = document.getElementById('ai-probability-badge');
+            const actualTop3Block = document.getElementById('actual-top3-block');
+            const actualTop3List = document.getElementById('actual-top3-list');
+            const multiFaceTable = document.getElementById('multi-face-table');
+            const multiFaceTbody = document.getElementById('multi-face-tbody');
+
+            if (data.results && data.results.length > 0) {
+                const detection = data.results[0];
+
+                // Show summary info for the primary detection
+                resultsDiv.innerHTML = `
+                    <p><strong>Yosh:</strong> ${detection.age}</p>
+                    <p><strong>Jins:</strong> ${detection.gender.prediction} (${(detection.gender.confidence * 100).toFixed(1)}%)</p>
+                    <p><strong>Kiyim:</strong> ${detection.clothing.type} (${(detection.clothing.confidence * 100).toFixed(1)}%)</p>
+                `;
+
+                // Show all detected faces in a table (if >1)
+                if (data.results.length > 1) {
+                    multiFaceTable.style.display = '';
+                    multiFaceTbody.innerHTML = '';
+                    data.results.forEach((face, idx) => {
+                        multiFaceTbody.innerHTML += `
+                            <tr>
+                                <td>${idx+1}</td>
+                                <td>${face.age}</td>
+                                <td>${face.gender.prediction}</td>
+                                <td>${face.clothing.type}</td>
+                                <td>${((face.gender.confidence + face.clothing.confidence) * 50).toFixed(1)}%</td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    multiFaceTable.style.display = 'none';
+                }
+
+                // Update statistics if available
+                if (data.statistics) {
+                    document.getElementById('purpose-text').textContent = data.statistics.purpose_text;
+                    document.getElementById('comparison-text').textContent = data.statistics.comparison;
+                    document.getElementById('probability-bar').style.width = `${data.statistics.final_prob}%`;
+                    document.getElementById('probability-bar').textContent = `${data.statistics.final_prob}%`;
+                    aiProbabilityBadge.textContent = `${data.statistics.final_prob}%`;
+                    // Suggested models
+                    const suggestedCarsList = document.getElementById('suggested-cars-list');
+                    suggestedCarsList.innerHTML = '';
+                    (data.statistics.suggested_cars_list || []).forEach(car => {
+                        suggestedCarsList.innerHTML += `<li class="list-group-item">${car}</li>`;
+                    });
+                    // Actual top3 for demographic
+                    if (data.statistics.actual_top3 && data.statistics.actual_top3.length > 0) {
+                        actualTop3Block.style.display = '';
+                        actualTop3List.innerHTML = '';
+                        data.statistics.actual_top3.forEach(car => {
+                            actualTop3List.innerHTML += `<li class="list-group-item">${car}</li>`;
+                        });
+                    } else {
+                        actualTop3Block.style.display = 'none';
+                    }
+                    document.getElementById('suggestion-text').textContent = data.statistics.suggestion_text;
+                    statsPanel.style.display = 'block';
+                } else {
+                    statsPanel.style.display = 'none';
+                }
+
+                document.getElementById('detection-results').style.display = 'block';
+                actionPanel.style.display = 'block';
+            }
+        }
+
+        function updateOverlay(results) {
+            const overlayContainer = document.getElementById('overlay-container');
+            overlayContainer.innerHTML = '';
+
+            if (!results) return;
+
+            const video = document.getElementById('camera-feed');
+            const scaleX = video.offsetWidth / video.videoWidth;
+            const scaleY = video.offsetHeight / video.videoHeight;
+
+            results.forEach((result, index) => {
+                const box = document.createElement('div');
+                box.className = 'detection-box';
+
+                // Scale coordinates to match video display size
+                const x = result.face_coordinates.x * scaleX;
+                const y = result.face_coordinates.y * scaleY;
+                const width = result.face_coordinates.width * scaleX;
+                const height = result.face_coordinates.height * scaleY;
+
+                box.style.left = `${x}px`;
+                box.style.top = `${y}px`;
+                box.style.width = `${width}px`;
+                box.style.height = `${height}px`;
+
+                const info = document.createElement('div');
+                info.className = 'detection-info';
+                info.textContent = `${result.age} yosh, ${result.gender.prediction}`;
+
+                box.appendChild(info);
+                overlayContainer.appendChild(box);
+            });
+        }
+
+        async function saveDetection() {
+            const phone = document.getElementById('phone-input').value;
+            if (!phone.match(/^\+998[0-9]{9}$/)) {
+                alert("Telefon raqamini to'g'ri kiriting!");
+                return;
+            }
+
+            // Optionally send detection ID or more data for saving
+            let detectionId = lastDetectionData && lastDetectionData.id ? lastDetectionData.id : null;
+
+            try {
+                const response = await fetch('/api/save_detection', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        phone: phone,
+                        detection_id: detectionId
+                    })
+                });
+
+                if (!response.ok) throw new Error('Failed to save');
+
+                const data = await response.json();
+                alert("Ma'lumotlar saqlandi!");
+
+                // Clear form and panels
+                document.getElementById('phone-input').value = '';
+                document.getElementById('detection-results').style.display = 'none';
+                document.getElementById('action-panel').style.display = 'none';
+                document.getElementById('statistics-panel').style.display = 'none';
+                document.getElementById('overlay-container').innerHTML = '';
+
+            } catch (error) {
+                showError('Xatolik: ' + error.message);
+            }
+        }
+
+        // Start camera when page loads
+        window.addEventListener('load', startCamera);
+        // Cleanup when page unloads
+        window.addEventListener('unload', stopCamera);
+    </script>
+</body>
+</html>

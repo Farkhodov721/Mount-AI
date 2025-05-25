@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yangi mijoz qo'shish</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .prediction-card {
+            display: none;
+            margin-top: 18px;
+        }
+        .chart-container {
+            height: 300px;
+            margin-top: 18px;
+        }
+        .form-label {
+            margin-bottom: 4px;
+        }
+        .card-header {
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+        .card-body {
+            padding-top: 18px;
+            padding-bottom: 16px;
+        }
+        .mb-3 {
+            margin-bottom: 12px !important;
+        }
+        .btn, .form-control, .form-select {
+            font-size: 15px;
+        }
+        #statPreview .row > div {
+            padding-bottom: 5px;
+            padding-top: 5px;
+        }
+        .card {
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-3">
+        <div class="row justify-content-center">
+            <div class="col-lg-8 col-md-10">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Yangi mijoz qo'shish</h5>
+                        <small>Farkhodov721 - 2025-05-24 14:52:49</small>
+                    </div>
+                    <div class="card-body pt-3 pb-2">
+                        <div class="mb-2">
+                            <a href="{{ url_for('camera_monitor') }}" class="btn btn-primary btn-sm">
+                                <i class="fas fa-video"></i> Kamera monitoring
+                            </a>
+                        </div>
+                        {% with messages = get_flashed_messages(with_categories=true) %}
+                            {% if messages %}
+                                {% for category, message in messages %}
+                                    <div class="alert alert-{{ category }} py-2 my-2">{{ message }}</div>
+                                {% endfor %}
+                            {% endif %}
+                        {% endwith %}
+
+                        <form id="customerForm" method="POST" autocomplete="off">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="name" class="form-label">F.I.Sh</label>
+                                    <input type="text" class="form-control" id="name" name="name" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="phone" class="form-label">Telefon</label>
+                                    <input type="tel" class="form-control" id="phone" name="phone"
+                                           pattern="\+998[0-9]{9}" placeholder="+998901234567" required>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label for="age" class="form-label">Yosh</label>
+                                    <input type="number" class="form-control" id="age" name="age"
+                                           min="18" max="100" required>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="gender" class="form-label">Jinsi</label>
+                                    <select class="form-select" id="gender" name="gender" required>
+                                        <option value="">Tanlang</option>
+                                        <option value="Erkak">Erkak</option>
+                                        <option value="Ayol">Ayol</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="clothes" class="form-label">Kiyimi</label>
+                                    <select class="form-select" id="clothes" name="clothes" required>
+                                        <option value="">Tanlang</option>
+                                        <option value="Jeans va futbolka">Jeans va futbolka</option>
+                                        <option value="Kostyum">Kostyum</option>
+                                        <option value="Sport kiyim">Sport kiyim</option>
+                                        <option value="Yengil ko'ylak">Yengil ko'ylak</option>
+                                        <option value="Libos">Libos</option>
+                                        <option value="Ofis kiyim">Ofis kiyim</option>
+                                        <option value="Shortik va futbolka">Shortik va futbolka</option>
+                                        <option value="Polo va shim">Polo va shim</option>
+                                        <option value="Klassik kostyum">Klassik kostyum</option>
+                                        <option value="Futbolka va shortik">Futbolka va shortik</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="entry_time" class="form-label">Kirish vaqti</label>
+                                    <input type="datetime-local" class="form-control" id="entry_time"
+                                           name="entry_time" required>
+                                </div>
+                                <!-- Removed exit_time field here! -->
+                            </div>
+
+                            <div class="row mb-2">
+                                <div class="col-12">
+                                    <button type="button" class="btn btn-primary w-100" onclick="generateStats()">
+                                        Bashorat qilish
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Prediction Results -->
+                            <div id="statPreview" class="prediction-card">
+                                <div class="alert alert-info py-2 mb-2">
+                                    <p id="purposeText" class="mb-1"></p>
+                                    <p id="comparison" class="mb-1"></p>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <span id="heuristicProb" class="mb-0"></span>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <span id="mlProb" class="mb-0"></span>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <span id="finalProb" class="mb-0 fw-bold"></span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="card mb-2">
+                                    <div class="card-body pt-2 pb-2">
+                                        <h6 class="card-subtitle mb-2 text-muted">Tavsiya etilgan modellar:</h6>
+                                        <p id="suggestedCars" class="card-text mb-1"></p>
+                                        <p id="suggestionText" class="card-text mb-0"></p>
+                                    </div>
+                                </div>
+
+                                <!-- Hidden fields for form submission -->
+                                <input type="hidden" id="predicted_purpose" name="predicted_purpose">
+                                <input type="hidden" id="suggested_cars" name="suggested_cars">
+                                <input type="hidden" id="purchase_prob" name="purchase_prob">
+
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="purchase" name="purchase" value="yes">
+                                    <label class="form-check-label" for="purchase">
+                                        Xarid amalga oshdi
+                                    </label>
+                                </div>
+
+                                <button type="submit" class="btn btn-success w-100">Saqlash</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        async function generateStats() {
+            const name = document.getElementById('name').value;
+            const age = parseInt(document.getElementById('age').value);
+            const gender = document.getElementById('gender').value;
+            const clothes = document.getElementById('clothes').value;
+            const entry_time = document.getElementById('entry_time').value;
+
+            if (!name || !age || !gender || !clothes || !entry_time) {
+                alert("Barcha maydonlarni to'ldiring!");
+                return;
+            }
+
+            try {
+                const response = await fetch('/generate_statistics', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name, age, gender, clothes, entry_time
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || "Statistika generatsiyasida xatolik!");
+                }
+
+                const data = await response.json();
+
+                // Update UI with predictions
+                document.getElementById('purposeText').textContent = data.purpose_text;
+                document.getElementById('comparison').textContent = data.comparison;
+                document.getElementById('heuristicProb').innerHTML =
+                    `<b>Heuristic model taxmini:</b> ${data.heuristic_prob}%`;
+                document.getElementById('mlProb').innerHTML =
+                    `<b>ML model taxmini:</b> ${data.ml_prob}%`;
+                document.getElementById('finalProb').innerHTML =
+                    `<b>Umumiy xarid ehtimoli:</b> ${data.final_prob}%`;
+                document.getElementById('suggestedCars').textContent = data.suggested_cars;
+                document.getElementById('suggestionText').textContent = data.suggestion_text;
+
+                // Update hidden fields
+                document.getElementById('predicted_purpose').value = data.purpose;
+                document.getElementById('suggested_cars').value = data.suggested_cars;
+                document.getElementById('purchase_prob').value = data.final_prob / 100;
+
+                // Show prediction card
+                document.getElementById('statPreview').style.display = 'block';
+
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        // Time input validation (no exit_time logic needed anymore)
+        // Only validate entry_time is not empty
+        document.getElementById('entry_time').addEventListener('change', function() {
+            const entry = new Date(document.getElementById('entry_time').value);
+            if (!entry) {
+                alert("Kirish vaqti to'g'ri kiritilmadi!");
+            }
+        });
+    </script>
+</body>
+</html>

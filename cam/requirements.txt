@@ -1,0 +1,8 @@
+Flask==2.3.3
+Flask-SQLAlchemy==3.0.5
+Flask-CORS==4.0.0
+Flask-Limiter==3.5.0
+SQLAlchemy==2.0.21
+Werkzeug==2.3.7
+redis==5.0.0
+python-dotenv==1.0.0
