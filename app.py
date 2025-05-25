@@ -1094,6 +1094,77 @@ def analyze_person():
             'message': str(e)
         }), 400
 
+import random
+
+def flatten_str_list(lst):
+    result = []
+    for item in lst:
+        if isinstance(item, list):
+            result.extend(flatten_str_list(item))
+        else:
+            result.append(str(item))
+    return result
+
+def generate_camera_statistics(age, gender, clothes):
+    # 1. Predict purpose (randomly for demo)
+    purposes = ["servis", "sotib olish", "test drive", "ma'lumot olish"]
+    purpose = random.choice(purposes)
+
+    # 2. Duration (fixed for demo)
+    duration = 35
+
+    # 3. Predict probabilities
+    heuristic_prob = round(random.uniform(0.2, 0.5), 2)  # e.g. 0.35
+    ml_prob = round(random.uniform(0.2, 0.5), 2)         # e.g. 0.24
+    final_prob = round(0.7 * heuristic_prob + 0.3 * ml_prob, 2)
+    final_prob_pct = int(final_prob * 100)
+
+    # 4. Suggest models based on gender/age/final_prob/purpose
+    if gender == "Erkak":
+        suggested_cars = ["Chevrolet Nexia 3", "Chevrolet Cobalt", "Chevrolet Damas"]
+        recent = ["Chevrolet Labo", "Chevrolet Malibu", "Chevrolet Malibu 2"]
+    else:
+        suggested_cars = ["Chevrolet Spark", "Chevrolet Tracker", "Chevrolet Onix"]
+        recent = ["Chevrolet Matiz", "Chevrolet Tracker", "Chevrolet Onix"]
+    suggestion_text = (
+        f"Ehtimol pastroq. Siz uchun arzon va ishonchli variantlar — {', '.join(suggested_cars)}. "
+        f"Bu guruhda so'nggi xaridlar: {', '.join(recent)}. Test drive tavsiya qilamiz."
+    )
+
+    # 5. Age group text
+    age_group_start = (age // 5) * 5
+    age_group_end = age_group_start + 4
+    comparison = f"{age_group_start}-{age_group_end} yoshli {gender.lower()}lar ichida xarid qilish ehtimoli: {final_prob_pct}%"
+
+    # 6. Compose text
+    result = {
+        "purpose": purpose,
+        "purpose_text": f"{gender}, {age} yosh uchun AI taxmini: {purpose} (salonda {duration} daqiqa)",
+        "comparison": comparison,
+        "heuristic_prob": int(heuristic_prob * 100),
+        "ml_prob": int(ml_prob * 100),
+        "final_prob": final_prob_pct,
+        "suggested_cars": ", ".join(flatten_str_list(suggested_cars)),
+        "suggested_cars_list": flatten_str_list(suggested_cars),
+        "suggestion_text": suggestion_text,
+        "actual_top3": recent
+    }
+    return result
+
+# --- Example usage ---
+if __name__ == "__main__":
+    age = 43
+    gender = "Erkak"
+    clothes = "Kostyum"
+    stats = generate_camera_statistics(age, gender, clothes)
+    print(stats["purpose_text"])
+    print(stats["comparison"])
+    print(f"Heuristic model taxmini: {stats['heuristic_prob']}%")
+    print(f"ML model taxmini: {stats['ml_prob']}%")
+    print(f"Umumiy xarid ehtimoli: {stats['final_prob']}%")
+    print(f"Tavsiya etilgan modellar:\n\n{stats['suggested_cars']}")
+    print(stats["suggestion_text"])
+
 
 if __name__ == '__main__':
     if os.path.exists("avtosalon.db"):
